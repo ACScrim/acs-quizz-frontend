@@ -1,1 +1,146 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+
+/* Base styles */
+body {
+  background-color: #000;
+  color: #e0e0e0;
+}
+
+/* Cyberpunk font */
+.cyberpunk-font {
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.05em;
+}
+
+/* Neon text effect */
+.neon-text {
+  text-shadow: 
+    0 0 5px rgba(0, 255, 255, 0.7),
+    0 0 10px rgba(0, 255, 255, 0.5),
+    0 0 15px rgba(255, 0, 255, 0.5),
+    0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+/* Scanlines effect */
+.scanlines {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.03),
+    rgba(255, 255, 255, 0.03) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+}
+
+/* Grid background */
+.grid-bg {
+  background-size: 40px 40px;
+  background-image:
+    linear-gradient(to right, rgba(236, 72, 153, 0.1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(6, 182, 212, 0.1) 1px, transparent 1px);
+  transform: perspective(500px) rotateX(60deg);
+  transform-origin: bottom;
+  height: 100vh;
+}
+
+/* Vignette effect */
+.vignette {
+  background: radial-gradient(
+    ellipse at center,
+    transparent 60%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
+}
+
+/* Glitch effect */
+.glitch-effect {
+  background-image: url("data:image/png;base64,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");
+}
+
+/* Synthwave sun */
+.synthwave-sun {
+  box-shadow: 
+    0 0 40px rgba(255, 0, 128, 0.7),
+    0 0 80px rgba(255, 0, 255, 0.5),
+    0 0 120px rgba(255, 0, 255, 0.3);
+}
+
+@keyframes glitch {
+  0% {
+    text-shadow: 
+      -2px -2px 0 #0ff,
+      2px 2px 0 #f0f;
+  }
+  25% {
+    text-shadow: 
+      2px -2px 0 #0ff,
+      -2px 2px 0 #f0f;
+  }
+  50% {
+    text-shadow: 
+      -1px -1px 0 #0ff,
+      1px 1px 0 #f0f;
+  }
+  75% {
+    text-shadow: 
+      1px -1px 0 #0ff,
+      -1px 1px 0 #f0f;
+  }
+  100% {
+    text-shadow: 
+      -2px -2px 0 #0ff,
+      2px 2px 0 #f0f;
+  }
+}
+
+.cyberpunk-glitch {
+  color: white;
+  text-shadow:
+    -2px -2px 0 #0ff,
+    2px 2px 0 #f0f;
+  animation: glitch 2s infinite alternate;
+  position: relative;
+  display: inline-block;
+}
+
+.cyberpunk-glitch::before,
+.cyberpunk-glitch::after {
+  content: attr(data-content);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cyberpunk-glitch::before {
+  left: 2px;
+  text-shadow: -3px 0 #f0f;
+  animation: glitch-2 3s infinite alternate-reverse;
+}
+
+.cyberpunk-glitch::after {
+  left: -2px;
+  text-shadow: 3px 0 #0ff;
+  animation: glitch-3 4s infinite alternate-reverse;
+}
+
+@keyframes glitch-2 {
+  0% { clip-path: inset(20% 0 30% 0); }
+  20% { clip-path: inset(40% 0 10% 0); }
+  40% { clip-path: inset(70% 0 80% 0); }
+  60% { clip-path: inset(10% 0 60% 0); }
+  80% { clip-path: inset(30% 0 70% 0); }
+  100% { clip-path: inset(50% 0 20% 0); }
+}
+
+@keyframes glitch-3 {
+  0% { clip-path: inset(80% 0 10% 0); }
+  20% { clip-path: inset(30% 0 60% 0); }
+  40% { clip-path: inset(0% 0 40% 0); }
+  60% { clip-path: inset(50% 0 30% 0); }
+  80% { clip-path: inset(10% 0 50% 0); }
+  100% { clip-path: inset(70% 0 40% 0); }
+}

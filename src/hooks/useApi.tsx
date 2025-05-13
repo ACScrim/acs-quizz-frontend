@@ -43,17 +43,24 @@ export function useApi() {
       try {
         setGlobalLoading(true);
 
+        // Récupération du token depuis le sessionStorage
+        const accessToken = sessionStorage.getItem("accessToken");
+
         // Construction des headers
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
           ...options.headers,
         };
 
+        if (accessToken) {
+          headers["Authorization"] = `Bearer ${accessToken}`;
+        }
+
         // Options de la requête
         const fetchOptions: RequestInit = {
           method,
           headers,
-          credentials: options.withCredentials ? "include" : "same-origin",
+          credentials: options.withCredentials ?? true ? "include" : "same-origin",
           signal: options.signal,
           ...(body && { body: JSON.stringify(body) }),
         };
