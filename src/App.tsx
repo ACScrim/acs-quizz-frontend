@@ -1,9 +1,17 @@
+import DiscordLogin from "./components/DiscordLogin";
+import Navbar from "./components/Navbar";
+import CreateLobby from "./components/CreateLobby";
+import { useAuth } from "./hooks/useAuth";
+
 function App() {
+  const { user } = useAuth();
   return (
-    <p className='font-bold text-2xl text-center'>
-      Tailwind works !
-    </p>
-  )
+    <>
+      <Navbar />
+      {!user && <DiscordLogin />}
+      <CreateLobby />
+    </>
+  );
 }
 
-export default App
+export default App;
