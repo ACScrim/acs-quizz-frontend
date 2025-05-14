@@ -10,10 +10,10 @@ function DiscordCallbackPage() {
     const queryParams = new URLSearchParams(location.search);
     const accessToken = queryParams.get("access_token");
     const user = queryParams.get("user");
-    console.log({ accessToken, user });
+
     if (accessToken && user) {
-      sessionStorage.setItem("accessToken", accessToken);
-      sessionStorage.setItem("user", user);
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("user", user);
       navigate("/");
     }
   }, [location, navigate]);

@@ -29,6 +29,10 @@ const router = createBrowserRouter([
       }))
     ),
   },
+  {
+    path: "/lobby/:id",
+    element: <h1>Lobby</h1>
+  }
 ]);
 
 export const Router = () => {

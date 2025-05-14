@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useSocket } from "../hooks/useSocket";
+import { useNavigate } from "react-router";
 
 const CreateLobby: React.FC = () => {
   const [lobbyName, setLobbyName] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+
+  const navigate = useNavigate();
 
   const socket = useSocket({
     namespace: "lobbies"
@@ -28,7 +31,7 @@ const CreateLobby: React.FC = () => {
     });
 
     socket.on("lobby:created", (lobby) => {
-      console.log("Lobby:", lobby);
+      navigate(`/lobby/${lobby._id}`);
     })
 
     return () => {

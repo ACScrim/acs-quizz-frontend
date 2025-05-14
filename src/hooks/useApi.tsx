@@ -43,8 +43,8 @@ export function useApi() {
       try {
         setGlobalLoading(true);
 
-        // Récupération du token depuis le sessionStorage
-        const accessToken = sessionStorage.getItem("accessToken");
+        // Récupération du token depuis le localStorage
+        const accessToken = localStorage.getItem("accessToken");
 
         // Construction des headers
         const headers: Record<string, string> = {

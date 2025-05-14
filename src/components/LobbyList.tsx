@@ -53,7 +53,7 @@ const LobbyList = () => {
       {lobbies.length > 0 ? (
         <ul className="space-y-5">
           {lobbies.map((lobby: any) => (
-            <li key={lobby.id} className="relative group">
+            <li key={lobby._id} className="relative group">
               <div className="absolute inset-0 bg-gradient-to-r from-pink-600 to-cyan-600 rounded-lg opacity-60 blur-sm group-hover:opacity-80 transition-all duration-300"></div>
               <div className="relative bg-black bg-opacity-70 backdrop-blur-sm border-l-4 border-cyan-400 group-hover:border-pink-500 rounded-lg p-5 flex items-center justify-between transition-all duration-300">
                 <div className="space-y-1">

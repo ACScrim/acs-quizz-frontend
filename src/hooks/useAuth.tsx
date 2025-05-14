@@ -22,30 +22,18 @@ export function useAuth(): useAuthReturn {
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const logout = async () => {
-    sessionStorage.removeItem("accessToken");
-    sessionStorage.removeItem("user");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("user");
     setAccessToken(null);
     setUser(null);
   };
 
   useEffect(() => {
-    const storedAccessToken = sessionStorage.getItem("accessToken");
-    const storedUser = sessionStorage.getItem("user");
-
-    if (storedAccessToken) {
-      setAccessToken(storedAccessToken);
-    }
-
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (err) {
-        console.error(
-          "Erreur lors de la récupération de l'utilisateur depuis le localStorage:",
-          err
-        );
-      }
-    }
+    const storedAccessToken = localStorage.getItem("accessToken");
+    const storedUser = localStorage.getItem("user");
+ 
+    setAccessToken(storedAccessToken);
+    setUser(storedUser ? JSON.parse(storedUser) : null);
   }, []);
 
   return {

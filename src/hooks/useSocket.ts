@@ -15,7 +15,7 @@ export function useSocket({ namespace = "/", autoConnect = true }: UseSocketOpti
   useEffect(() => {
     const url = "http://localhost:3000";
     let instance = socketInstances[nsp];
-    const token = sessionStorage.getItem("accessToken");
+    const token = localStorage.getItem("accessToken");
 
     if (!instance) {
       instance = io(`${url}${nsp}`, {
