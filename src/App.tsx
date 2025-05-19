@@ -5,15 +5,17 @@ import { useAuth } from "./hooks/useAuth";
 import LobbyList from "./components/LobbyList";
 import { useApi } from "./hooks/useApi";
 import { useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 function App() {
   const { user } = useAuth();
   const api = useApi();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Vérifier si l'utilisateur est dans un lobby
   const checkMyLobbyAndMoveIfExists = async () => {
+    if (!user) return;
     const myLobby = await api.get<{ _id: string }>("/lobbies/mine");
     if (!myLobby) return;
     if (!myLobby.data) return;
@@ -21,8 +23,10 @@ function App() {
   };
 
   useEffect(() => {
-    checkMyLobbyAndMoveIfExists()
-  }, [])
+    if (location.pathname === "/") {
+      checkMyLobbyAndMoveIfExists()
+    }
+  }, [user, location.pathname])
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
