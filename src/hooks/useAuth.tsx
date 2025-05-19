@@ -1,14 +1,5 @@
 import { useState, useEffect } from "react";
-
-// Type pour les informations utilisateur
-interface User {
-  id: string;
-  username: string;
-  discordId?: string;
-  avatar?: string;
-  discriminator?: string;
-  // Ajoutez d'autres propriétés selon les besoins
-}
+import type { User } from "../types";
 
 interface useAuthReturn {
   user: User | null;

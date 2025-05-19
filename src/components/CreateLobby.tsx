@@ -40,49 +40,50 @@ const CreateLobby: React.FC = () => {
   }, [socket, socket?.connected]);
 
   return (
-    <div className="max-w-md mx-auto relative">
-      <div className="absolute inset-0 bg-gradient-to-r from-pink-600 via-purple-600 to-cyan-500 rounded-xl blur-md opacity-70"></div>
-      <div className="bg-black bg-opacity-80 backdrop-blur-sm border-2 border-cyan-400 rounded-xl p-8 relative">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400"></div>
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500"></div>
+    <div className="max-w-md mx-auto relative group">
+      <div className="absolute -inset-1 bg-gradient-to-r from-cyan-600 via-purple-700 to-pink-600 rounded-xl blur opacity-60 group-hover:opacity-90 transition duration-1000 group-hover:duration-300 animate-tilt"></div>
+      <div className="bg-gray-900 bg-opacity-85 backdrop-blur-md border border-purple-600 rounded-xl p-8 relative shadow-2xl">
+        {/* Lignes décoratives type HUD/interface */}
+        <div className="absolute top-2 left-2 w-8 h-8 border-t-2 border-l-2 border-cyan-400 opacity-50"></div>
+        <div className="absolute bottom-2 right-2 w-8 h-8 border-b-2 border-r-2 border-pink-400 opacity-50"></div>
         
-        <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-300 mb-6 cyberpunk-font neon-text">
-          CREATE LOBBY
+        <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-br from-cyan-300 via-purple-400 to-pink-400 mb-8 cyberpunk-font neon-text-strong text-center">
+          INITIATE LOBBY
         </h2>
         
         <div className="mb-6 relative">
-          <label htmlFor="lobbyName" className="block text-cyan-300 font-bold mb-2 uppercase tracking-wide text-sm">Lobby Name:</label>
+          <label htmlFor="lobbyName" className="block text-purple-300 font-semibold mb-2 uppercase tracking-wider text-xs cyberpunk-glitch-small">Lobby Datastream Name:</label>
           <input
             type="text"
             id="lobbyName"
             value={lobbyName}
             onChange={(e) => setLobbyName(e.target.value)}
-            className="w-full px-4 py-3 rounded bg-black bg-opacity-60 border-2 border-cyan-500 text-cyan-100 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all duration-300"
-            placeholder="Enter lobby name..."
+            className="w-full px-4 py-3 rounded-md bg-gray-800 bg-opacity-70 border-2 border-purple-500 text-cyan-100 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-600 placeholder-gray-500 transition-all duration-300"
+            placeholder="Enter unique identifier..."
           />
         </div>
         
         <div className="mb-8">
-          <label className="inline-flex items-center text-cyan-300 hover:text-pink-300 transition-colors cursor-pointer">
+          <label className="inline-flex items-center text-purple-300 hover:text-pink-300 transition-colors cursor-pointer group/checkbox">
             <div className="relative mr-3">
               <input
                 type="checkbox"
                 checked={isPrivate}
                 onChange={(e) => setIsPrivate(e.target.checked)}
-                className="sr-only"
+                className="sr-only peer" // Added peer
               />
-              <div className="w-10 h-5 bg-black rounded-full border border-cyan-500 toggle-bg"></div>
-              <div className={`absolute left-0.5 top-0.5 bg-cyan-500 w-4 h-4 rounded-full transition-transform ${isPrivate ? 'translate-x-5 bg-pink-500' : ''}`}></div>
+              <div className="w-11 h-6 bg-gray-700 rounded-full border border-purple-500 peer-checked:bg-pink-700 peer-checked:border-pink-500 transition-colors"></div>
+              <div className={`absolute left-1 top-1 bg-purple-400 peer-checked:bg-pink-300 w-4 h-4 rounded-full transition-all duration-300 transform peer-checked:translate-x-5`}></div>
             </div>
-            Private Lobby
+            Secure Channel (Private)
           </label>
         </div>
         
         <button
           onClick={handleCreateLobby}
-          className="w-full py-3 px-4 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 text-black font-bold rounded hover:from-cyan-400 hover:via-purple-500 hover:to-pink-500 transition-all duration-300 uppercase tracking-wide hover:scale-105 transform hover:shadow-[0_0_15px_rgba(236,72,153,0.5)]"
+          className="w-full py-3 px-4 bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 text-white font-bold rounded-md hover:shadow-[0_0_20px_rgba(236,72,153,0.7)] focus:outline-none focus:ring-2 focus:ring-pink-400 focus:ring-opacity-75 transition-all duration-300 uppercase tracking-wider hover:scale-105 transform"
         >
-          Create Lobby
+          Establish Connection
         </button>
       </div>
     </div>
