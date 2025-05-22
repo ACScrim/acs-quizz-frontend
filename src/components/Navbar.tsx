@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from "../contexts/AuthContext";
 
 const Navbar: React.FC = () => {
   const { user } = useAuth();

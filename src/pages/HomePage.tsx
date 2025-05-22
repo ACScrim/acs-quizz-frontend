@@ -1,7 +1,7 @@
 import CreateLobby from "../components/CreateLobby";
 import DiscordLogin from "../components/DiscordLogin";
 import LobbyList from "../components/LobbyList";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from "../contexts/AuthContext";
 
 const HomePage = () => {
   const { user } = useAuth();

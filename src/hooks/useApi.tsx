@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 // Configuration de base de l'API
 const API_BASE_URL = "http://localhost:3000/api";
@@ -27,6 +28,7 @@ interface ApiResponse<T> {
 export function useApi() {
   // État global pour suivre si une requête est en cours dans l'application
   const [globalLoading, setGlobalLoading] = useState<boolean>(false);
+  const { accessToken } = useAuth();
 
   // Fonction principale pour effectuer les requêtes
   const request = useCallback(
@@ -42,9 +44,6 @@ export function useApi() {
 
       try {
         setGlobalLoading(true);
-
-        // Récupération du token depuis le localStorage
-        const accessToken = localStorage.getItem("accessToken");
 
         // Construction des headers
         const headers: Record<string, string> = {
@@ -116,7 +115,7 @@ export function useApi() {
 
       return { data: responseData, loading: false, error };
     },
-    []
+    [accessToken]
   );
 
   // Méthodes HTTP

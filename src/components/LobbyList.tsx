@@ -1,18 +1,35 @@
-import { useEffect, useState } from "react";
-import { useSocket } from "../hooks/useSocket"
+import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useApi } from "../hooks/useApi";
+import { useSocket } from "../hooks/useSocket";
+import { LobbyData } from "../types";
+import { useAuth } from "../contexts/AuthContext";
 
 const LobbyList = () => {
-  const [lobbies, setLobbies] = useState([]);
   const socket = useSocket({ namespace: "lobbies" });
   const api = useApi();
+  const { isAuthenticated } = useAuth();
+
+  const { data: lobbies, refetch: refetchLobbies } = useQuery<LobbyData[]>({
+    queryKey: ["lobbies", isAuthenticated],
+    queryFn: async () => {
+      if (!api) return [];
+      if (!isAuthenticated) return [];
+      const response = await api.get<LobbyData[]>("/lobbies");
+      if (response.error) {
+        console.error("Error fetching lobbies:", response.error);
+        return [];
+      }
+      return response.data || [];
+    }
+  });
 
   useEffect(() => {
     if (!socket) return;
 
     const onUpdate = () => {
       console.log("Lobby created");
-      fetchLobbies();
+      refetchLobbies();
     };
 
     if (!socket.connected) {
@@ -27,17 +44,6 @@ const LobbyList = () => {
     };
   }, [socket, socket?.connected]);
 
-  async function fetchLobbies() {
-    if (!api) return;
-    if (api.loading) return;
-    const lobbies = (await api.get<any>("/lobbies")).data;
-    setLobbies(lobbies);
-  }
-
-  useEffect(() => {
-    fetchLobbies();
-  }, []);
-
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-10 relative">
@@ -48,7 +54,7 @@ const LobbyList = () => {
         </h2>
       </div>
       
-      {lobbies.length > 0 ? (
+      {lobbies && lobbies.length > 0 ? (
         <ul className="space-y-6">
           {lobbies.map((lobby: any) => (
             <li key={lobby._id} className="relative group transition-all duration-300 hover:scale-[1.02]">
@@ -61,7 +67,7 @@ const LobbyList = () => {
                   <p className="text-purple-300 text-sm flex items-center">
                     <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 group-hover:bg-pink-400 mr-2.5 animate-ping-slow opacity-75 group-hover:opacity-100"></span>
                     <span className="mr-1">Operators:</span> <span className="text-cyan-200 group-hover:text-white">{lobby.players.length}</span><span className="text-purple-400">/{lobby.maxPlayers}</span>
-                    <span className="ml-auto text-xs text-gray-500 group-hover:text-purple-300">ID: {lobby.id.slice(-6)}</span>
+                    <span className="ml-auto text-xs text-gray-500 group-hover:text-purple-300">ID: {lobby._id.slice(-6)}</span>
                   </p>
                 </div>
                 

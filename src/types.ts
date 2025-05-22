@@ -5,6 +5,8 @@ export interface User {
   discordId?: string;
   avatar?: string;
   discriminator?: string;
+  accessToken: string;
+  refreshToken: string;
   // Ajoutez d'autres propriétés selon les besoins
 }
 
@@ -37,4 +39,5 @@ export interface Quizz {
   playerLives?: Record<string, number>; // Vies des joueurs
   createdAt: string;
   updatedAt: string;
+  questionIndex: number; // Index de la question actuelle
 }

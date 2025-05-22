@@ -2,30 +2,40 @@ import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import Navbar from "./components/Navbar";
 import { useApi } from "./hooks/useApi";
-import { useAuth } from "./hooks/useAuth";
+import { useAuth } from "./contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 
 function App() {
-  const { user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const api = useApi();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Vérifier si l'utilisateur est dans un lobby
-  const checkMyLobbyAndMoveIfExists = async () => {
-    if (!user) return;
-    const myLobby = await api.get<{ _id: string }>("/lobbies/mine");
-    if (!myLobby) return;
-    if (!myLobby.data) return;
-    navigate(`lobby/${myLobby.data._id}`);
-  };
+  const { data: myLobby } = useQuery<string | null>({
+    queryKey: ["lobbies", "mine", isAuthenticated],
+    queryFn: async () => {
+      if (!api) return null;
+      if (!isAuthenticated) return null;
+      const response = await api.get<{ _id: string }>("/lobbies/mine");
+      if (response.error) {
+        // console.error("Error fetching my lobby:", response.error);
+        return null;
+      }
+      return response.data?._id || null;
+    }
+  });
 
   useEffect(() => {
     if (location.pathname === "/") {
-      checkMyLobbyAndMoveIfExists()
+      if (isAuthenticated) {
+        if (myLobby) {
+          navigate(`/lobby/${myLobby}`);
+        }
+      }
     }
-  }, [user, location.pathname])
+  }, [isAuthenticated, location.pathname, myLobby])
 
-    return (
+  return (
     <div className="min-h-screen bg-gray-900 text-white relative overflow-hidden"> {/* Base plus sombre */}
       {/* Optionnel: Fond de pluie digitale/particules (nécessite CSS/JS pour un effet complet) */}
       <div className="absolute inset-0 z-0 opacity-20 digital-rain-bg"></div>
