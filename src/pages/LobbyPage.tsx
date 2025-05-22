@@ -8,7 +8,13 @@ import PlayerList from "../components/PlayerList";
 import { useAuth } from "../contexts/AuthContext";
 import { useApi } from "../hooks/useApi";
 import { useSocket } from "../hooks/useSocket";
-import { CreateQuizFormData, LobbyData, Quizz } from "../types";
+import { CreateQuizFormData, LobbyData, Quizz, QuizzPhase } from "../types";
+import QuizErrorView from "../components/quiz/QuizErrorView";
+import BattleRoyalQuizView from "../components/quiz/BattleRoyalQuizView";
+import PointsQuizView from "../components/quiz/PointsQuizView";
+
+const ROUND_DURATION = 10; // secondes pour répondre
+const CORRECTION_DISPLAY_DURATION = 3; // secondes pour afficher la correction
 
 const LobbyPage: React.FC = () => {
   const { id: lobbyId } = useParams<{ id: string }>();
@@ -17,68 +23,185 @@ const LobbyPage: React.FC = () => {
   const api = useApi();
   const queryClient = useQueryClient();
 
-  // Quizz State
+  const [joinedSocketLobby, setJoinedSocketLobby] = useState(false);
+
   const [questionIndex, setQuestionIndex] = useState(0);
+  const [quizzPhase, setQuizzPhase] = useState<QuizzPhase>('answering');
+  const [timeLeft, setTimeLeft] = useState(ROUND_DURATION);
+  const [playerLocalAnswer, setPlayerLocalAnswer] = useState<string | null>(null);
+  const [revealedCorrectAnswerId, setRevealedCorrectAnswerId] = useState<string | null>(null);
+  const [playerSubmittedAnswerForDisplay, setPlayerSubmittedAnswerForDisplay] = useState<string | null>(null);
+
 
   const socket = useSocket({ namespace: "lobbies" });
 
   const { data: lobby, refetch: refetchLobby, isLoading, error } = useQuery<LobbyData | null>({
     queryKey: ["lobby", lobbyId, isAuthenticated],
     queryFn: async () => {
-      if (!api) return null;
-      if (!isAuthenticated) return null;
+      if (!api || !isAuthenticated) return null;
       const response = await api.get<LobbyData>(`/lobbies/${lobbyId}`);
       if (response.error) {
         console.error("Error fetching lobby:", response.error);
         return null;
       }
       if (response.data?.activeQuizz) {
-        setQuestionIndex(response.data.activeQuizz.questionIndex);
+        // Initialiser l'index de la question et la phase si le quiz est déjà en cours
+        setQuestionIndex(response.data.activeQuizz.questionIndex || 0);
+        if (response.data.activeQuizz.status === 'in_progress') {
+          setQuizzPhase('answering');
+          setTimeLeft(ROUND_DURATION);
+        } else if (response.data.activeQuizz.status === 'finished') {
+          setQuizzPhase('game_over');
+        }
       }
       return response.data;
     },
+    // Désactiver le refetch automatique pour mieux contrôler avec les sockets
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
   });
 
-  useEffect(() => {
-    if (!socket) return;
+  const currentQuiz = lobby?.activeQuizz;
+  const isOwner = currentUser?.id === lobby?.owner.id;
 
-    if (!socket.connected) {
-      socket.connect();
-      return;
+  // Minuteur principal du jeu
+  useEffect(() => {
+    if (!currentQuiz || currentQuiz.status !== 'in_progress' || quizzPhase === 'game_over') {
+      return () => {
+        // Nettoyage si nécessaire, mais le timerId est déjà nettoyé
+      };
     }
 
-    // Message envoyé aux autres utilisateurs du lobby
-    socket.on("lobby:user-join", (user) => {
+    // Gérer la fin de la phase d'affichage de la correction
+    if (timeLeft <= 0 && quizzPhase === 'showing_correction') {
+      setQuizzPhase('round_over');
+      setRevealedCorrectAnswerId(null);
+      setPlayerSubmittedAnswerForDisplay(null); // Effacer la réponse soumise pour l'affichage
 
-    });
-
-    socket.on("lobby:user-leave", (user) => {
-
-    });
-
-    socket.on("lobby:left", () => {
-      navigate('/');
-    });
-
-    socket.on("lobby:quizz-generated", (quizz: Quizz) => {
-      console.log("Quizz generated:", quizz);
-      if (quizz) {
-        refetchLobby();
+      if (isOwner) {
+        console.log("Correction time's up. Requesting next question...");
+        socket?.emit("lobby:quizz:next-question", { lobbyId: lobbyId, quizId: currentQuiz._id });
       }
-    });
+      return () => { /* clearInterval(timerId) sera fait par le return principal */ };
+    }
 
-    socket.on("lobby:quizz-started", () => {
-      setQuestionIndex(1);
-    });
+    // Si le temps est écoulé pour une autre phase ou si on n'est pas dans une phase avec timer actif, ne rien faire ici.
+    if (timeLeft <= 0) {
+      return () => { /* clearInterval(timerId) sera fait par le return principal */ };
+    }
+
+    const timerId = setInterval(() => {
+      if (quizzPhase === "showing_correction") {
+        setTimeLeft((prevTime) => Math.max(0, prevTime - 1)); // S'assurer que le temps ne devient pas négatif
+      }
+    }, 1000);
+
+    return () => { clearInterval(timerId) }; // Nettoyer l'intervalle
+  }, [timeLeft, quizzPhase, currentQuiz, socket, lobbyId, isOwner]); // playerLocalAnswer retiré des dépendances
+
+
+  useEffect(() => {
+    if (!socket || !lobby) return;
+    if (!socket.connected) socket.connect();
+
+    // Gérer la réception d'une nouvelle question (ou la première)
+    const handleNewQuestion = (quizzData: Quizz) => {
+      queryClient.setQueryData(["lobby", lobbyId, isAuthenticated], (oldData: LobbyData | undefined) => {
+        if (!oldData) return oldData;
+        return { ...oldData, activeQuizz: quizzData };
+      });
+      setQuestionIndex(quizzData.questionIndex);
+      setQuizzPhase('answering');
+      setTimeLeft(ROUND_DURATION);
+      setPlayerLocalAnswer(null);
+      setRevealedCorrectAnswerId(null);
+      setPlayerSubmittedAnswerForDisplay(null);
+      console.log("New question received, index:", quizzData.questionIndex);
+    };
+
+    // NOUVEAU HANDLER : Le serveur indique que le temps de réponse est écoulé
+    const handleAnsweringTimeUp = () => {
+      if (quizzPhase === 'answering') { // S'assurer qu'on est bien dans cette phase
+        console.log("Server says time's up! Submitting local answer:", playerLocalAnswer);
+        socket?.emit("lobby:quizz:submit-answer", {
+          lobbyId: lobbyId,
+          quizId: currentQuiz?._id,
+          answer: playerLocalAnswer, // Peut être null
+        });
+        setPlayerSubmittedAnswerForDisplay(playerLocalAnswer); // Garder une trace pour l'affichage
+        // playerLocalAnswer n'est pas réinitialisé ici, car il a déjà été soumis.
+        // Il sera réinitialisé à la prochaine question.
+        setQuizzPhase('waiting_for_correction'); // Attendre que le serveur envoie les résultats
+      }
+    };
+
+    // Gérer la fin du quiz
+    const handleQuizFinished = (finishedQuizData: Quizz) => {
+      queryClient.setQueryData(["lobby", lobbyId, isAuthenticated], (oldData: LobbyData | undefined) => {
+        if (!oldData) return oldData;
+        return { ...oldData, activeQuizz: finishedQuizData };
+      });
+      setQuizzPhase('game_over');
+      console.log("Quiz finished!");
+    };
+
+    const handleAnswerResult = (data: { isCorrect: boolean, correctAnswer: string }) => {
+      console.log("Answer result received:", data);
+      setRevealedCorrectAnswerId(data.correctAnswer);
+      // playerSubmittedAnswerForDisplay est déjà défini au moment de la soumission
+      setQuizzPhase('showing_correction');
+      setTimeLeft(CORRECTION_DISPLAY_DURATION);
+    };
+
+    const handleScoresUpdate = (data: { playerPoints?: Record<string, number>; playerLives?: Record<string, number>; }) => {
+      console.log("Scores updated:", data);
+      queryClient.setQueryData(["lobby", lobbyId, isAuthenticated], (oldData: LobbyData | undefined) => {
+        if (!oldData || !oldData.activeQuizz) return oldData;
+        return {
+          ...oldData,
+          activeQuizz: {
+            ...oldData.activeQuizz,
+            playerPoints: data.playerPoints || oldData.activeQuizz.playerPoints,
+            playerLives: data.playerLives || oldData.activeQuizz.playerLives,
+          },
+        };
+      });
+    };
+
+    const handleAnsweringTimeLeft = (timeLeft: number) => {
+      console.log("Time left for answering:", timeLeft);
+      setTimeLeft(timeLeft);
+    }
+
+    // ... (autres listeners: user-join, user-leave, lobby-left, quizz-generated)
+    socket.on("lobby:quizz-generated", () => refetchLobby()); // ou mise à jour ciblée
+    socket.on("lobby:quizz-started", handleNewQuestion); // Le démarrage est comme une nouvelle question (la première)
+    socket.on("lobby:quizz:new-question", handleNewQuestion); // Pour les questions suivantes
+    socket.on("lobby:quizz:answer-result", handleAnswerResult);
+    socket.on("lobby:quizz:update-scores", handleScoresUpdate);
+    socket.on("lobby:quizz:finished", handleQuizFinished);
+    socket.on("lobby:quizz:answering-time-up", handleAnsweringTimeUp);
+    socket.on("lobby:quizz:answering-time-left", handleAnsweringTimeLeft);
+
 
     return () => {
-      socket.off("lobby:user-join");
-      socket.off("lobby:user-leave");
-      socket.off("lobby:left");
+      // ... (socket.off pour tous les listeners)
       socket.off("lobby:quizz-generated");
-      socket.off("lobby:quizz-started");
+      socket.off("lobby:quizz-started", handleNewQuestion);
+      socket.off("lobby:quizz:new-question", handleNewQuestion);
+      socket.off("lobby:quizz:answer-result", handleAnswerResult);
+      socket.off("lobby:quizz:update-scores", handleScoresUpdate);
+      socket.off("lobby:quizz:finished", handleQuizFinished);
+      socket.off("lobby:quizz:answering-time-up", handleAnsweringTimeUp);
+      socket.off("lobby:quizz:answering-time-left", handleAnsweringTimeLeft);
+    };
+  }, [socket, lobby, lobbyId, queryClient, refetchLobby, isAuthenticated, currentQuiz, playerLocalAnswer, quizzPhase, isOwner, joinedSocketLobby]);
+
+  const handleSelectAnswer = (answerId: string) => {
+    if (quizzPhase === 'answering') {
+      setPlayerLocalAnswer(answerId);
     }
-  }, [socket, socket?.connected]);
+  };
 
   const handleLeaveLobby = async () => {
     if (!socket || !lobbyId) return;
@@ -102,10 +225,8 @@ const LobbyPage: React.FC = () => {
   };
 
   const handleStartQuiz = () => {
-    if (!socket || !lobby || !lobby.activeQuizz) return;
-    console.log("Attempting to start quiz:", lobby.activeQuizz._id);
+    if (!socket || !lobby || !lobby.activeQuizz || !isOwner) return;
     socket.emit("lobby:start:quizz", { lobbyId: lobby._id, quizId: lobby.activeQuizz._id });
-    // La navigation sera gérée par l'événement "lobby:quizz-started"
   };
 
   if (isLoading) {
@@ -133,46 +254,94 @@ const LobbyPage: React.FC = () => {
     );
   }
 
-  if (questionIndex > 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <p className="cyberpunk-font text-2xl text-cyan-400 neon-text">Quiz in progress... ({questionIndex} / {lobby.activeQuizz?.questions.length})</p>
-        {/* Vous pouvez ajouter un composant de quiz ici */}
-      </div>
-    );
+  if (currentQuiz && (currentQuiz.status === "in_progress" || currentQuiz.status === "pending" && quizzPhase !== 'game_over')) {
+    if (!currentQuiz.questions || currentQuiz.questions.length === 0) {
+      return <QuizErrorView message="Quiz questions are not loaded." />;
+    }
+    // Si le quiz est 'pending' mais que le propriétaire n'a pas encore cliqué sur "Start",
+    // on pourrait afficher un écran d'attente différent pour les joueurs et un bouton "Start" pour le propriétaire.
+    // Pour l'instant, on assume que si activeQuizz existe, on essaie de montrer l'interface du quiz.
+
+    // Si le quiz est terminé, afficher un écran de résultats/fin
+    if (quizzPhase === 'game_over') {
+      // TODO: Créer un composant QuizResultsView
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-center p-4">
+          <Navbar />
+          <h2 className="cyberpunk-font text-3xl text-pink-500 neon-text-strong mb-4">QUIZ TERMINÉ !</h2>
+          {/* Afficher les scores finaux ici, en utilisant currentQuiz.playerPoints/playerLives */}
+          <button
+            onClick={() => navigate(`/lobby/${lobbyId}`)} // Revenir au lobby ou à la liste des lobbies
+            className="mt-8 py-2 px-6 bg-cyan-600 hover:bg-cyan-500 text-gray-900 font-bold rounded-md transition-all duration-300 uppercase tracking-wider"
+          >
+            Retour au Lobby
+          </button>
+        </div>
+      );
+    }
+
+
+    const questionData = currentQuiz.questions[questionIndex];
+    if (!questionData && currentQuiz.status === "in_progress") {
+      // Cela peut arriver brièvement si questionIndex est mis à jour avant que les données du quiz ne le soient complètement
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-900">
+          <p className="cyberpunk-font text-2xl text-cyan-400 neon-text">Synchronizing question...</p>
+        </div>
+      );
+    }
+
+
+    const commonQuizProps = {
+      quizz: currentQuiz,
+      currentUser: currentUser,
+      questionIndex: questionIndex,
+      onSelectAnswer: handleSelectAnswer,
+      timeLeft: timeLeft,
+      quizzPhase: quizzPhase, // Passez la phase actuelle
+      selectedAnswerId: playerLocalAnswer,
+      revealedCorrectAnswerId: revealedCorrectAnswerId,
+      playerSubmittedAnswerId: playerSubmittedAnswerForDisplay,
+      playersList: lobby.players, // Assurez-vous que c'est le bon format attendu par les vues
+    };
+
+    if (currentQuiz.gameMode === "battleRoyal") {
+      return <BattleRoyalQuizView {...commonQuizProps} />;
+    } else if (currentQuiz.gameMode === "points") {
+      return <PointsQuizView {...commonQuizProps} />;
+    } else {
+      return <QuizErrorView message={`Unknown quiz game mode: ${currentQuiz.gameMode}`} />;
+    }
   }
 
-  const isOwner = currentUser?.id === lobby.owner.id;
-  const hasActiveQuiz = !!lobby.activeQuizz;
+  // ... (Rendu du lobby normal si pas de quiz actif ou si le quiz est 'pending' et non démarré par l'owner)
+  // Vous devrez peut-être ajuster cette logique pour afficher correctement LobbyActions
+  // même si un quiz est 'pending'.
 
   return (
-    // Le fond est géré par App.tsx, donc ici on se concentre sur le contenu
     <div className="relative z-10 px-8 py-8">
-
+      <Navbar />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        {/* Colonne principale (Détails et Actions) */}
         <div className="lg:col-span-2 space-y-6">
           <LobbyDetails
-            name={lobby.name}
-            ownerName={lobby.owner.username}
-            playerCount={lobby.players.length}
-            maxPlayers={100}
-            lobbyCode={lobby.code}
+            name={lobby?.name || "Loading..."}
+            ownerName={lobby?.owner.username || "N/A"}
+            playerCount={lobby?.players.length || 0}
+            maxPlayers={100} // ou lobby.maxPlayers
+            lobbyCode={lobby?.code || "N/A"}
           />
           <LobbyActions
             isOwner={isOwner}
             onGenerateQuiz={handleGenerateQuiz}
             onLeaveLobby={handleLeaveLobby}
-            lobbyId={lobby._id}
-            hasActiveQuiz={hasActiveQuiz}
+            lobbyId={lobbyId!}
+            hasActiveQuiz={!!currentQuiz}
             onStartQuiz={handleStartQuiz}
-            activeQuizDetails={lobby.activeQuizz}
+            activeQuizDetails={currentQuiz ? { gameMode: currentQuiz.gameMode, pointsToReach: currentQuiz.pointsToReach, maxLives: currentQuiz.maxLives } : null}
           />
         </div>
-
-        {/* Colonne latérale (Liste des joueurs) */}
         <div className="lg:col-span-1">
-          <PlayerList players={lobby.players} currentUser={currentUser} />
+          <PlayerList players={lobby?.players || []} currentUser={currentUser} />
         </div>
       </div>
     </div>
