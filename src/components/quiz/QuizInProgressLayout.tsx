@@ -143,12 +143,12 @@ const QuizInProgressLayout: React.FC<QuizInProgressLayoutProps> = ({
                       key={option || index}
                       onClick={() => handleAnswerClick(option)}
                       // Désactiver si ce n'est pas la phase de réponse ou si la correction est affichée
-                      disabled={!isAnsweringPhase}
+                      disabled={!isAnsweringPhase || ( gameMode === "battleRoyal" && currentUserId && playersListData[currentUserId] === 0 ) || false}
                       className={`
                             p-4 rounded-lg border-2 transition-all duration-200 ease-in-out
                             text-left text-lg font-medium cyberpunk-font focus:outline-none group/answer
                             ${buttonClass}
-                            ${!isAnsweringPhase ? 'cursor-not-allowed opacity-70' : ''}
+                            ${!isAnsweringPhase || ( gameMode === "battleRoyal" && currentUserId && playersListData[currentUserId] === 0 )|| false ? 'cursor-not-allowed opacity-70' : ''}
                         `}
                     >
                       <span className="mr-2 text-pink-400 group-hover/answer:text-cyan-300 transition-colors">

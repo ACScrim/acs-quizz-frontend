@@ -12,6 +12,7 @@ import { CreateQuizFormData, LobbyData, Quizz, QuizzPhase } from "../types";
 import QuizErrorView from "../components/quiz/QuizErrorView";
 import BattleRoyalQuizView from "../components/quiz/BattleRoyalQuizView";
 import PointsQuizView from "../components/quiz/PointsQuizView";
+import LastQuizzModalLeaderboard from "../components/quiz/LastQuizzModalLeaderboard";
 
 const ROUND_DURATION = 10; // secondes pour répondre
 const CORRECTION_DISPLAY_DURATION = 3; // secondes pour afficher la correction
@@ -31,6 +32,7 @@ const LobbyPage: React.FC = () => {
   const [playerLocalAnswer, setPlayerLocalAnswer] = useState<string | null>(null);
   const [revealedCorrectAnswerId, setRevealedCorrectAnswerId] = useState<string | null>(null);
   const [playerSubmittedAnswerForDisplay, setPlayerSubmittedAnswerForDisplay] = useState<string | null>(null);
+  const [showLastQuizzModalLeaderboard, setShowLastQuizzModalLeaderboard] = useState<Quizz | null>(null);
 
 
   const socket = useSocket({ namespace: "lobbies" });
@@ -63,6 +65,17 @@ const LobbyPage: React.FC = () => {
 
   const currentQuiz = lobby?.activeQuizz;
   const isOwner = currentUser?.id === lobby?.owner.id;
+
+  useEffect(() => {
+    if (!currentUser || !currentQuiz) return;
+    if (currentQuiz.playerLives && Object.keys(currentQuiz.playerLives).length === 1) {
+      if (currentQuiz.playerLives[currentUser.id] === 0) {
+        // Si le joueur est le seul restant et qu'il n'a plus de vies, on termine le quiz
+        socket?.emit("lobby:stop:quizz", lobbyId);
+        console.log("You are the last player with no lives left. Ending quiz.");
+      }
+    }
+  }, [currentQuiz, currentUser])
 
   // Minuteur principal du jeu
   useEffect(() => {
@@ -101,8 +114,13 @@ const LobbyPage: React.FC = () => {
 
 
   useEffect(() => {
-    if (!socket || !lobby) return;
+    if (!socket || !lobby || !currentUser) return;
     if (!socket.connected) socket.connect();
+
+    // Rejoindre la room du lobby à chaque (re)connexion
+    if (!joinedSocketLobby && currentUser) {
+      socket.emit("lobby:join", lobbyId);
+    }
 
     // Gérer la réception d'une nouvelle question (ou la première)
     const handleNewQuestion = (quizzData: Quizz) => {
@@ -139,9 +157,10 @@ const LobbyPage: React.FC = () => {
     const handleQuizFinished = (finishedQuizData: Quizz) => {
       queryClient.setQueryData(["lobby", lobbyId, isAuthenticated], (oldData: LobbyData | undefined) => {
         if (!oldData) return oldData;
-        return { ...oldData, activeQuizz: finishedQuizData };
+        return { ...oldData, activeQuizz: null };
       });
       setQuizzPhase('game_over');
+      setShowLastQuizzModalLeaderboard(finishedQuizData); // Afficher le modal de fin de quiz
       console.log("Quiz finished!");
     };
 
@@ -173,29 +192,41 @@ const LobbyPage: React.FC = () => {
       setTimeLeft(timeLeft);
     }
 
+    const handleLobbyJoined = ({ quizz, lobbyId, timeLeft }: { quizz: Quizz, lobbyId: string, timeLeft: number }) => {
+      console.log("Joined lobby:", lobbyId, "with quiz:", quizz);
+      queryClient.setQueryData(["lobby", lobbyId, isAuthenticated], (oldData: LobbyData | undefined) => {
+        if (!oldData) return oldData;
+        return { ...oldData, activeQuizz: quizz };
+      });
+      setTimeLeft(timeLeft)
+      setJoinedSocketLobby(true);
+    }
+
     // ... (autres listeners: user-join, user-leave, lobby-left, quizz-generated)
     socket.on("lobby:quizz-generated", () => refetchLobby()); // ou mise à jour ciblée
     socket.on("lobby:quizz-started", handleNewQuestion); // Le démarrage est comme une nouvelle question (la première)
+    socket.on("lobby:quizz-stopped", handleQuizFinished)
     socket.on("lobby:quizz:new-question", handleNewQuestion); // Pour les questions suivantes
     socket.on("lobby:quizz:answer-result", handleAnswerResult);
     socket.on("lobby:quizz:update-scores", handleScoresUpdate);
-    socket.on("lobby:quizz:finished", handleQuizFinished);
     socket.on("lobby:quizz:answering-time-up", handleAnsweringTimeUp);
     socket.on("lobby:quizz:answering-time-left", handleAnsweringTimeLeft);
+    socket.on("lobby:joined", handleLobbyJoined);
 
 
     return () => {
       // ... (socket.off pour tous les listeners)
       socket.off("lobby:quizz-generated");
       socket.off("lobby:quizz-started", handleNewQuestion);
+      socket.off("lobby:quizz-stopped", handleQuizFinished);
       socket.off("lobby:quizz:new-question", handleNewQuestion);
       socket.off("lobby:quizz:answer-result", handleAnswerResult);
       socket.off("lobby:quizz:update-scores", handleScoresUpdate);
-      socket.off("lobby:quizz:finished", handleQuizFinished);
       socket.off("lobby:quizz:answering-time-up", handleAnsweringTimeUp);
       socket.off("lobby:quizz:answering-time-left", handleAnsweringTimeLeft);
+      socket.off("lobby:joined", handleLobbyJoined);
     };
-  }, [socket, lobby, lobbyId, queryClient, refetchLobby, isAuthenticated, currentQuiz, playerLocalAnswer, quizzPhase, isOwner, joinedSocketLobby]);
+  }, [socket, lobby, lobbyId, queryClient, refetchLobby, isAuthenticated, currentQuiz, playerLocalAnswer, quizzPhase, isOwner, joinedSocketLobby, currentUser]);
 
   const handleSelectAnswer = (answerId: string) => {
     if (quizzPhase === 'answering') {
@@ -320,7 +351,6 @@ const LobbyPage: React.FC = () => {
 
   return (
     <div className="relative z-10 px-8 py-8">
-      <Navbar />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-2 space-y-6">
           <LobbyDetails
@@ -344,6 +374,12 @@ const LobbyPage: React.FC = () => {
           <PlayerList players={lobby?.players || []} currentUser={currentUser} />
         </div>
       </div>
+      <LastQuizzModalLeaderboard 
+        quizz={showLastQuizzModalLeaderboard}
+        players={lobby.players}
+        show={!!showLastQuizzModalLeaderboard}
+        onClose={() => setShowLastQuizzModalLeaderboard(null)}
+      />
     </div>
   );
 };
